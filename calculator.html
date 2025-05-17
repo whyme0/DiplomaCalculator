@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расчет нагрузок на оси автопоезда</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; 
+            color: #1e293b; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+        .main-container {
+            width: 100%;
+            max-width: 1400px; 
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem; 
+        }
+        @media (min-width: 1024px) { /* lg breakpoint */
+            .main-container {
+                flex-direction: row;
+            }
+        }
+        .form-column {
+            flex: 1;
+            min-width: 320px; 
+        }
+         @media (min-width: 1024px) { /* lg breakpoint */
+            .form-column {
+                 max-width: 450px;
+            }
+        }
+        .diagram-column {
+            flex: 2; 
+            display: flex;
+            flex-direction: column;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem; 
+            padding: 1.5rem; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            margin-bottom: 1.5rem;
+        }
+        h1 {
+            font-size: 1.875rem; 
+            font-weight: 700;
+            color: #0f172a; 
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        h2 {
+            font-size: 1.25rem; 
+            font-weight: 600;
+            color: #334155; 
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #e2e8f0; 
+            padding-bottom: 0.5rem;
+        }
+        h3 {
+            font-size: 1rem; 
+            font-weight: 600;
+            color: #475569; 
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        label {
+            display: block;
+            font-size: 0.875rem; 
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            color: #475569;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 0.625rem 0.75rem; 
+            border: 1px solid #cbd5e1; 
+            border-radius: 0.375rem; 
+            box-sizing: border-box;
+            font-size: 0.875rem;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        input[type="number"]:focus {
+            border-color: #2563eb; 
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25); 
+            outline: none;
+        }
+        .input-group {
+            margin-bottom: 0.75rem; 
+        }
+        button[type="submit"] {
+            width: 100%;
+            padding: 0.75rem; 
+            background-color: #2563eb; 
+            color: white;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 1.5rem;
+        }
+        button[type="submit"]:hover {
+            background-color: #1d4ed8; 
+        }
+        .results-summary p {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: #334155;
+        }
+        .results-summary span {
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .diagram-section, .drum-layout-diagram-container { /* Shared style for diagram areas */
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            position: relative;
+            background-color: #f8fafc; 
+            border-radius: 0.375rem;
+            overflow: hidden; 
+        }
+        .diagram-section { /* Main vehicle diagram */
+             min-height: 250px; 
+        }
+        .drum-layout-diagram-container { /* For drum layout views */
+            min-height: 280px; 
+            margin-top: 0.5rem; 
+        }
+        .vehicle-component { 
+            position: absolute;
+            border: 2px solid;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            border-radius: 0.25rem;
+            box-sizing: border-box;
+        }
+        .tractor-chassis {
+            background-color: rgba(251, 146, 60, 0.3); 
+            border-color: #f97316;
+            z-index: 1;
+        }
+        .tractor-cabin {
+            background-color: rgba(251, 146, 60, 0.5); 
+            border-color: #ea580c; 
+            z-index: 2; 
+        }
+        .semitrailer-body { /* For main vehicle diagram */
+            background-color: rgba(59, 130, 246, 0.3); 
+            border-color: #2563eb;
+            z-index: 1;
+        }
+        .drum-layout-trailer-outline { /* For drum layout diagrams */
+            position: absolute;
+            border: 1px dashed #64748b; 
+            box-sizing: border-box;
+        }
+        .drum-visual {
+            position: absolute;
+            background-color: rgba(107, 114, 128, 0.5); 
+            border: 1px solid #4b5563;
+            box-sizing: border-box;
+        }
+        .axle-marker { 
+            position: absolute;
+            width: 8px;
+            background-color: #334155; 
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+            z-index: 5;
+        }
+        .axle-force-arrow {
+            position: absolute;
+            width: 0; 
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 8px solid #334155; 
+            z-index: 4; 
+        }
+        .fifth-wheel-marker {
+            position: absolute;
+            width: 20px;
+            height: 10px;
+            background-color: #475569; 
+            border: 1px solid #1e293b;
+            border-radius: 2px;
+            z-index: 10; 
+        }
+        .axle-load-display { 
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            border: 1px solid #94a3b8; 
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            color: #1e293b;
+            z-index: 15; 
+        }
+        .dimension-label { /* Style for dimension labels in drum layout */
+            position: absolute;
+            font-size: 0.65rem; 
+            color: #4b5563; 
+            background-color: rgba(240, 244, 248, 0.7); 
+            padding: 1px 3px;
+            border-radius: 2px;
+            white-space: nowrap;
+            z-index: 20; 
+        }
+        .error-message {
+            color: #dc2626; 
+            font-weight: 500;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background-color: #fee2e2; 
+            border: 1px solid #f87171; 
+            border-radius: 0.375rem;
+        }
+        .consistency-check { 
+            font-size: 0.8em;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            margin-top: 0.25rem;
+        }
+        .consistency-ok { background-color: #dcfce7; color: #166534; }
+        .consistency-error { background-color: #fee2e2; color: #991b1b; }
+        .consistency-neutral { background-color: #e0e7ff; color: #3730a3; }
+
+    </style>
+</head>
+<body class="bg-gray-100">
+    <h1 class="text-3xl font-bold text-center my-8 text-slate-800">Расчет нагрузок на оси автопоезда</h1>
+
+    <div class="main-container">
+        <div class="form-column">
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4">Входные данные</h2>
+                <form id="loadCalculatorForm">
+                    <h3>Параметры груза (барабаны):</h3>
+                    <div class="input-group">
+                        <label for="drum_mass">Масса одного барабана, кг:</label>
+                        <input type="number" id="drum_mass" name="drum_mass" value="4123" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="drum_length">Длина барабана, мм:</label>
+                        <input type="number" id="drum_length" name="drum_length" value="2200" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="drum_width">Ширина барабана, мм:</label>
+                        <input type="number" id="drum_width" name="drum_width" value="1386" required>
+                    </div>
+
+                    <h3>Параметры полуприцепа:</h3>
+                     <div class="input-group">
+                        <label for="trailer_internal_length">Внутренняя длина кузова п/п, мм:</label>
+                        <input type="number" id="trailer_internal_length" name="trailer_internal_length" value="11985" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trailer_internal_width">Внутренняя ширина кузова п/п, мм:</label>
+                        <input type="number" id="trailer_internal_width" name="trailer_internal_width" value="2450" required>
+                    </div>
+                     <div class="input-group">
+                        <label for="trailer_length_vis">Длина п/п (габаритная/для расчета a,b), мм:</label>
+                        <input type="number" id="trailer_length_vis" step="1" value="12530" required> 
+                    </div>
+                    <div class="input-group">
+                        <label for="mc_n_SSU">Снаряженная масса на ССУ (mc<sub>n_ССУ</sub>), кг:</label>
+                        <input type="number" id="mc_n_SSU" name="mc_n_SSU" value="2900" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="mc_n_tel">Снаряженная масса на тележку п/прицепа (mc<sub>n_тел</sub>), кг:</label>
+                        <input type="number" id="mc_n_tel" name="mc_n_tel" value="5100" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trailer_axle_count">Количество осей на тележке п/п (n):</label>
+                        <input type="number" id="trailer_axle_count" name="trailer_axle_count" step="1" value="3" min="1" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="z">Расстояние между средней осью тележки и шкворнем (z), мм:</label>
+                        <input type="number" id="z" name="z" step="1" value="7035" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trailer_rear_overhang_y">Расстояние от центра задних осей до заднего края п/п (y), мм:</label>
+                        <input type="number" id="trailer_rear_overhang_y" name="trailer_rear_overhang_y" step="1" value="3823" required> 
+                    </div>
+                    
+                    <h3>Параметры тягача:</h3>
+                    <div class="input-group">
+                        <label for="mc_ts_po">Снаряженная масса на переднюю ось (mc<sub>тс_по</sub>), кг:</label>
+                        <input type="number" id="mc_ts_po" name="mc_ts_po" value="6270" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="mc_ts_zo">Снаряженная масса на заднюю ось (mc<sub>тс_зо</sub>), кг:</label>
+                        <input type="number" id="mc_ts_zo" name="mc_ts_zo" value="2800" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="l_max">Межосевое расстояние тягача (l<sub>max</sub>), мм:</label>
+                        <input type="number" id="l_max" name="l_max" step="1" value="3780" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="d">Расстояние от ССУ до задней оси тягача (d), мм:</label>
+                        <input type="number" id="d" name="d" step="1" value="765" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="c">Расстояние от ССУ до передней оси тягача (c), мм:</label>
+                        <input type="number" id="c" name="c" step="1" value="3015" required>
+                    </div>
+                     <div id="cdl_consistency_message" class="consistency-check consistency-neutral">Проверка: c + d = l<sub>max</sub></div>
+
+                    <h3>Габариты для рисунка (вид сбоку):</h3>
+                     <div class="input-group">
+                        <label for="trailer_height_vis">Высота п/п, мм:</label>
+                        <input type="number" id="trailer_height_vis" step="1" value="2430" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trailer_kingpin_to_front_vis">Расст. от ССУ до перед. края п/п (виз.), мм:</label>
+                        <input type="number" id="trailer_kingpin_to_front_vis" step="1" value="1760" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="tractor_length_vis">Длина тягача (визуально), мм:</label>
+                        <input type="number" id="tractor_length_vis" step="1" value="6250" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="tractor_height_vis">Высота тягача (визуально), мм:</label>
+                        <input type="number" id="tractor_height_vis" step="1" value="3940" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="tractor_front_overhang_vis">Передний свес тягача (визуально), мм:</label>
+                        <input type="number" id="tractor_front_overhang_vis" step="1" value="1500" required>
+                    </div>
+                    <div class="input-group hidden"> 
+                        <label for="tractor_cabin_length_vis_percentage">Длина кабины тягача (% от общей длины тягача):</label>
+                        <input type="number" id="tractor_cabin_length_vis_percentage" step="1" value="35" min="10" max="70" required>
+                    </div>
+                    <div class="input-group hidden"> 
+                        <label for="tractor_cabin_height_vis_percentage">Высота кабины тягача (% от общей высоты тягача):</label>
+                        <input type="number" id="tractor_cabin_height_vis_percentage" step="1" value="70" min="30" max="95" required>
+                    </div>
+
+                    <button type="submit">Рассчитать и отобразить</button>
+                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+                </form>
+            </div>
+        </div>
+
+        <div class="diagram-column">
+            <div class="card results-summary">
+                <h2 class="text-xl font-semibold mb-4">Результаты расчета масс:</h2>
+                <p>Количество барабанов: <span id="num_drums_result">-</span> шт.</p>
+                <p>Расчетная масса груза (m<sub>груза_n</sub>): <span id="calculated_cargo_mass_result">-</span> кг</p>
+                <hr class="my-2 border-gray-300">
+                <p>Автопоезда (W): <span id="W_result">-</span> кг</p>
+                <p>Действующей на опорно-сцепное устройство (M): <span id="M_result">-</span> кг</p>
+                <p>Приходящейся на тележку полуприцепа (N): <span id="N_result_total">-</span> кг 
+                   (<span id="N_axle_count_display">-</span> оси по <span id="N_result_individual">-</span> кг на каждую)
+                </p>
+                <p>Приходящейся на переднюю ось автомобиля-тягача (F): <span id="F_result">-</span> кг</p>
+                <p>Приходящейся на заднюю ось автомобиля-тягача (R): <span id="R_result">-</span> кг</p>
+            </div>
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4">Схема автопоезда:</h2>
+                <div class="diagram-section" id="diagramContainer">
+                    </div>
+            </div>
+            <div class="card">
+                <h2 class="text-xl font-semibold mb-4">Схема размещения барабанов в полуприцепе:</h2>
+                <h3 class="text-md font-medium mt-2 mb-1">Вид сбоку:</h3>
+                <div class="drum-layout-diagram-container" id="drumSideViewDiagramContainer"></div>
+                <h3 class="text-md font-medium mt-4 mb-1">Вид сверху:</h3>
+                <div class="drum-layout-diagram-container" id="drumTopViewDiagramContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('loadCalculatorForm');
+            const diagramContainer = document.getElementById('diagramContainer'); 
+            const drumSideViewContainer = document.getElementById('drumSideViewDiagramContainer');
+            const drumTopViewContainer = document.getElementById('drumTopViewDiagramContainer');
+            const errorMessageDiv = document.getElementById('errorMessage');
+
+            const num_drums_result_span = document.getElementById('num_drums_result');
+            const calculated_cargo_mass_result_span = document.getElementById('calculated_cargo_mass_result');
+            const W_result_span = document.getElementById('W_result');
+            const M_result_span = document.getElementById('M_result');
+            const N_result_total_span = document.getElementById('N_result_total');
+            const N_result_individual_span = document.getElementById('N_result_individual');
+            const N_axle_count_display_span = document.getElementById('N_axle_count_display');
+            const F_result_span = document.getElementById('F_result');
+            const R_result_span = document.getElementById('R_result');
+
+            const input_c_tractor = document.getElementById('c'); 
+            const input_d_tractor = document.getElementById('d'); 
+            const input_l_max_tractor = document.getElementById('l_max'); 
+            const cdl_consistency_message_div = document.getElementById('cdl_consistency_message');
+
+            function convertToMeters(valueInMillimeters) {
+                return (parseFloat(valueInMillimeters) || 0) / 1000;
+            }
+             function parseFloatSafe(value) {
+                const num = parseFloat(value);
+                return isNaN(num) ? 0 : num;
+            }
+
+
+            function check_cdl_consistency() {
+                const c_val_m = convertToMeters(input_c_tractor.value);
+                const d_val_m = convertToMeters(input_d_tractor.value);
+                const l_max_val_m = convertToMeters(input_l_max_tractor.value);
+
+                cdl_consistency_message_div.classList.remove('consistency-ok', 'consistency-error', 'consistency-neutral');
+
+                if (l_max_val_m <= 0 && (c_val_m > 0 || d_val_m > 0)) {
+                     cdl_consistency_message_div.innerHTML = 'Проверка: c + d = l<sub>max</sub> (l<sub>max</sub> должно быть > 0 м)';
+                     cdl_consistency_message_div.classList.add('consistency-neutral');
+                     return false;
+                }
+                 if (l_max_val_m <=0 ) { 
+                    cdl_consistency_message_div.innerHTML = 'Проверка: c + d = l<sub>max</sub>';
+                    cdl_consistency_message_div.classList.add('consistency-neutral');
+                    return true;
+                }
+
+                const sum_cd_m = c_val_m + d_val_m;
+                if (Math.abs(sum_cd_m - l_max_val_m) < 0.0001) { 
+                    cdl_consistency_message_div.innerHTML = `ОК: c (${c_val_m.toFixed(3)} м) + d (${d_val_m.toFixed(3)} м) = ${sum_cd_m.toFixed(3)} м ≈ l<sub>max</sub> (${l_max_val_m.toFixed(3)} м)`;
+                    cdl_consistency_message_div.classList.add('consistency-ok');
+                    return true;
+                } else {
+                    cdl_consistency_message_div.innerHTML = `Ошибка: c (${c_val_m.toFixed(3)} м) + d (${d_val_m.toFixed(3)} м) = ${sum_cd_m.toFixed(3)} м ≠ l<sub>max</sub> (${l_max_val_m.toFixed(3)} м)`;
+                    cdl_consistency_message_div.classList.add('consistency-error');
+                    return false;
+                }
+            }
+            
+            [input_c_tractor, input_d_tractor, input_l_max_tractor].forEach(input => {
+                input.addEventListener('input', check_cdl_consistency);
+            });
+            
+            check_cdl_consistency(); 
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+                errorMessageDiv.textContent = '';
+                errorMessageDiv.style.display = 'none';
+
+                const trailer_internal_length_mm = parseFloatSafe(document.getElementById('trailer_internal_length').value);
+                const drum_mass_kg = parseFloatSafe(document.getElementById('drum_mass').value);
+                const drum_length_mm = parseFloatSafe(document.getElementById('drum_length').value);
+                const drum_width_mm = parseFloatSafe(document.getElementById('drum_width').value); 
+                const trailer_internal_width_mm = parseFloatSafe(document.getElementById('trailer_internal_width').value); 
+
+                let num_drums = 0;
+                 // Check for drum fit before calculating num_drums
+                let drumPlacementPossible = true;
+                let drumPlacementErrors = [];
+
+                if (drum_length_mm <= 0 || drum_width_mm <= 0 || trailer_internal_length_mm <= 0 || trailer_internal_width_mm <= 0) {
+                    // Basic dimension checks already handled below, this is for num_drums logic
+                } else {
+                    if (drum_width_mm > trailer_internal_width_mm) {
+                        drumPlacementErrors.push(`Ошибка размещения: Ширина барабана (${drum_width_mm} мм) превышает внутреннюю ширину кузова (${trailer_internal_width_mm} мм).`);
+                        drumPlacementPossible = false;
+                    }
+                    if (drum_length_mm > trailer_internal_length_mm) {
+                         drumPlacementErrors.push(`Ошибка размещения: Длина одного барабана (${drum_length_mm} мм) превышает внутреннюю длину кузова (${trailer_internal_length_mm} мм). Невозможно разместить ни одного барабана.`);
+                        drumPlacementPossible = false;
+                    }
+                }
+
+                if (drumPlacementPossible && drum_length_mm > 0 && trailer_internal_length_mm > 0) {
+                    num_drums = Math.floor(trailer_internal_length_mm / drum_length_mm);
+                    if (num_drums === 0 && drum_length_mm <= trailer_internal_length_mm) { 
+                        // This case should ideally not happen if drum_length_mm > 0.
+                        // It means trailer_internal_length_mm < drum_length_mm, already caught by length check.
+                    } else if (num_drums === 0 && drum_length_mm > trailer_internal_length_mm) {
+                        // This is redundant with the check above but kept for clarity if needed
+                        // drumPlacementErrors.push(`Ошибка размещения: Длина одного барабана (${drum_length_mm} мм) слишком велика для кузова (${trailer_internal_length_mm} мм).`);
+                    }
+                } else if (drumPlacementPossible && drum_length_mm > 0 && trailer_internal_length_mm > 0 && num_drums === 0) {
+                     // This means length was an issue even if width was OK
+                     if (!drumPlacementErrors.some(e => e.includes("Длина одного барабана"))) { // Avoid duplicate length error
+                        drumPlacementErrors.push(`Ошибка размещения: Невозможно разместить барабаны по длине.`);
+                     }
+                }
+
+
+                const m_gruza_n = num_drums * drum_mass_kg; 
+
+                const mc_n_SSU = parseFloatSafe(document.getElementById('mc_n_SSU').value);
+                const mc_n_tel = parseFloatSafe(document.getElementById('mc_n_tel').value);
+                const mc_ts_po = parseFloatSafe(document.getElementById('mc_ts_po').value);
+                const mc_ts_zo = parseFloatSafe(document.getElementById('mc_ts_zo').value);
+                const trailer_axle_count = parseInt(document.getElementById('trailer_axle_count').value);
+
+                const mc_n = mc_n_SSU + mc_n_tel; 
+                const mc_ts = mc_ts_po + mc_ts_zo; 
+
+                const trailer_length_param_m = convertToMeters(document.getElementById('trailer_length_vis').value); 
+                const z_param_m = convertToMeters(document.getElementById('z').value); 
+                const y_param_m = convertToMeters(document.getElementById('trailer_rear_overhang_y').value); 
+
+                const d_tractor_param_m = convertToMeters(document.getElementById('d').value); 
+                const c_tractor_param_m = convertToMeters(document.getElementById('c').value); 
+                const l_max_tractor_param_m = convertToMeters(document.getElementById('l_max').value); 
+
+                const x_calc_m = trailer_length_param_m - (z_param_m + y_param_m);
+                const a_load_dist_m = (trailer_length_param_m / 2) - x_calc_m;
+                const b_load_dist_m = (trailer_length_param_m / 2) - y_param_m;
+
+                let errors = [...drumPlacementErrors]; // Start with drum placement errors
+                 const allRequiredValues = [ 
+                    drum_mass_kg, drum_length_mm, drum_width_mm, trailer_internal_length_mm, trailer_internal_width_mm,
+                    mc_n_SSU, mc_n_tel, mc_ts_po, mc_ts_zo, trailer_axle_count,
+                    trailer_length_param_m, z_param_m, y_param_m,
+                    d_tractor_param_m, c_tractor_param_m, l_max_tractor_param_m
+                ];
+                
+                if (trailer_internal_length_mm <=0 && !errors.some(e => e.includes("Внутренняя длина кузова"))) errors.push("Внутренняя длина кузова п/п должна быть больше нуля.");
+                if (trailer_internal_width_mm <=0 && !errors.some(e => e.includes("Внутренняя ширина кузова"))) errors.push("Внутренняя ширина кузова п/п должна быть больше нуля.");
+                if (drum_mass_kg <=0 && !errors.some(e => e.includes("Масса одного барабана"))) errors.push("Масса одного барабана должна быть больше нуля.");
+                if (drum_length_mm <=0 && !errors.some(e => e.includes("Длина одного барабана"))) errors.push("Длина одного барабана должна быть больше нуля.");
+                if (drum_width_mm <=0 && !errors.some(e => e.includes("Ширина одного барабана"))) errors.push("Ширина одного барабана должна быть больше нуля.");
+
+
+                if (trailer_axle_count < 1) errors.push("Количество осей полуприцепа должно быть не менее 1.");
+                if (trailer_length_param_m <= 0) errors.push("Длина полуприцепа (визуально) должна быть больше нуля.");
+                if (z_param_m <= 0) errors.push("Расстояние (z) между средней осью тележки и шкворнем должно быть больше нуля.");
+                if (y_param_m < 0) errors.push("Расстояние (y) от центра задних осей до заднего края п/п не может быть отрицательным.");
+                
+                if (l_max_tractor_param_m <= 0) errors.push("База тягача (l<sub>max</sub>) должна быть больше нуля.");
+                if (c_tractor_param_m < 0) errors.push("Расстояние от ССУ до передней оси тягача (c) не может быть отрицательным.");
+                if (d_tractor_param_m < 0) errors.push("Расстояние от ССУ до задней оси тягача (d) не может быть отрицательным.");
+                
+                if (!check_cdl_consistency() && l_max_tractor_param_m > 0) {
+                     errors.push("Проверка 'c + d = l<sub>max</sub>' не пройдена. Уточните параметры тягача.");
+                }
+
+                if (errors.length > 0) {
+                    errorMessageDiv.innerHTML = errors.join('<br>');
+                    errorMessageDiv.style.display = 'block';
+                    clearResultsAndDiagram();
+                    return;
+                }
+
+                const W = mc_n + m_gruza_n + mc_ts; 
+                const M = mc_n_SSU + m_gruza_n * (b_load_dist_m / z_param_m); 
+                const N_total = mc_n_tel + m_gruza_n * (a_load_dist_m / z_param_m); 
+                const N_individual = N_total > 0 && trailer_axle_count > 0 ? N_total / trailer_axle_count : 0;
+                const F = mc_ts_po + M * (d_tractor_param_m / l_max_tractor_param_m);
+                const R = mc_ts_zo + M * (c_tractor_param_m / l_max_tractor_param_m);
+
+                num_drums_result_span.textContent = num_drums;
+                calculated_cargo_mass_result_span.textContent = m_gruza_n.toFixed(0);
+                W_result_span.textContent = W.toFixed(0);
+                M_result_span.textContent = M.toFixed(0);
+                N_result_total_span.textContent = N_total.toFixed(0);
+                N_result_individual_span.textContent = N_individual.toFixed(0);
+                N_axle_count_display_span.textContent = trailer_axle_count;
+                F_result_span.textContent = F.toFixed(0);
+                R_result_span.textContent = R.toFixed(0);
+
+                drawSchematic(M, N_total, N_individual, trailer_axle_count, F, R);
+                if (drumPlacementPossible && num_drums > 0) { // Only draw if drums can be placed
+                    drawDrumLayout(
+                        num_drums, 
+                        drum_length_mm, 
+                        drum_width_mm,
+                        trailer_internal_length_mm, 
+                        trailer_internal_width_mm,  
+                        parseFloatSafe(document.getElementById('trailer_height_vis').value) 
+                    );
+                } else {
+                    drumSideViewContainer.innerHTML = '<p class="text-center text-gray-500 p-4">Размещение барабанов невозможно из-за несоответствия габаритов.</p>';
+                    drumTopViewContainer.innerHTML = '';
+                }
+            });
+
+            function clearResultsAndDiagram() {
+                num_drums_result_span.textContent = '-';
+                calculated_cargo_mass_result_span.textContent = '-';
+                W_result_span.textContent = '-';
+                M_result_span.textContent = '-';
+                N_result_total_span.textContent = '-';
+                N_result_individual_span.textContent = '-';
+                N_axle_count_display_span.textContent = '-';
+                F_result_span.textContent = '-';
+                R_result_span.textContent = '-';
+                diagramContainer.innerHTML = '';
+                drumSideViewContainer.innerHTML = '';
+                drumTopViewContainer.innerHTML = '';
+            }
+            
+            function createAxleVisuals(x_center, groundY, parent, componentHeight) {
+                const axleVisualHeight = Math.min(15, componentHeight * 0.10);
+                
+                const marker = document.createElement('div');
+                marker.className = 'axle-marker';
+                marker.style.left = `${x_center - 4}px`;
+                marker.style.top = `${groundY - axleVisualHeight}px`; 
+                marker.style.height = `${axleVisualHeight}px`;
+                parent.appendChild(marker);
+
+                const arrow = document.createElement('div');
+                arrow.className = 'axle-force-arrow';
+                arrow.style.left = `${x_center - 5}px`; 
+                arrow.style.top = `${groundY + 2}px`; 
+                parent.appendChild(arrow);
+            }
+
+            function createAxleLoadLabel(x_center, groundY, text, parent) {
+                const label = document.createElement('div');
+                label.className = 'axle-load-display';
+                label.textContent = text;
+                
+                let labelX = x_center - 30; 
+                if (x_center < 60) labelX = x_center + 10; 
+                else if (x_center > parent.clientWidth - 100) labelX = x_center - 120; 
+
+                label.style.left = `${labelX}px`;
+                label.style.top = `${groundY + 12}px`; 
+                parent.appendChild(label);
+            }
+
+            function createDimensionLabel(text, x, y, parentElement, options = {}) {
+                const label = document.createElement('div');
+                label.className = 'dimension-label'; 
+                label.style.left = `${x}px`;
+                label.style.top = `${y}px`;
+                if (options.transform) label.style.transform = options.transform;
+                if (options.textAlign) label.style.textAlign = options.textAlign;
+                if (options.width) label.style.width = `${options.width}px`;
+                if (options.color) label.style.color = options.color;
+                label.innerHTML = text; 
+                parentElement.appendChild(label);
+            }
+
+
+            function drawSchematic(loadM, totalLoadN, individualLoadN, numTrailerAxles, loadF, loadR) {
+                diagramContainer.innerHTML = ''; 
+
+                const trailerLengthVis_m = convertToMeters(document.getElementById('trailer_length_vis').value);
+                const trailerHeightVis_m = convertToMeters(document.getElementById('trailer_height_vis').value);
+                const trailerKingpinToFrontVis_m = convertToMeters(document.getElementById('trailer_kingpin_to_front_vis').value); 
+                const trailerBaseZ_actual_m = convertToMeters(document.getElementById('z').value); 
+
+                const tractorLengthVis_m = convertToMeters(document.getElementById('tractor_length_vis').value);
+                const tractorHeightVis_m = convertToMeters(document.getElementById('tractor_height_vis').value);
+                const tractorBaseLmax_actual_m = convertToMeters(document.getElementById('l_max').value); 
+                const tractorSSUOffsetFromFrontAxle_actual_m = convertToMeters(document.getElementById('c').value); 
+                const tractorFrontOverhangVis_m = convertToMeters(document.getElementById('tractor_front_overhang_vis').value);
+                
+                const tractorCabinLengthPercentage = parseFloatSafe(document.getElementById('tractor_cabin_length_vis_percentage').value) / 100;
+                const tractorCabinHeightPercentage = parseFloatSafe(document.getElementById('tractor_cabin_height_vis_percentage').value) / 100;
+
+                let vis_errors = [];
+                 if ([trailerLengthVis_m, trailerHeightVis_m, tractorLengthVis_m, tractorHeightVis_m, tractorCabinLengthPercentage, tractorCabinHeightPercentage].some(v => v <= 0 || isNaN(v)) ||
+                    [trailerKingpinToFrontVis_m, tractorFrontOverhangVis_m].some(v => v < 0 || isNaN(v)) ) {
+                    vis_errors.push("Габаритные размеры для рисунка (включая % кабины) должны быть положительными (свесы >= 0) и корректно заполнены.");
+                }
+                 if (trailerKingpinToFrontVis_m > trailerLengthVis_m) vis_errors.push("Расстояние от ССУ до переднего края п/п (виз.) не может быть больше длины п/п.");
+                if (tractorFrontOverhangVis_m > tractorLengthVis_m) vis_errors.push("Передний свес тягача (виз.) не может быть больше длины тягача.");
+                
+                if (tractorSSUOffsetFromFrontAxle_actual_m < 0 && Math.abs(tractorSSUOffsetFromFrontAxle_actual_m) > tractorFrontOverhangVis_m) {
+                     vis_errors.push("Визуально: ССУ (по параметру 'c') находится слишком далеко впереди переднего свеса тягача.");
+                }
+                if (tractorSSUOffsetFromFrontAxle_actual_m > tractorBaseLmax_actual_m) { 
+                     vis_errors.push("Визуально: ССУ (по параметру 'c') находится за задней осью тягача (c > l<sub>max</sub>).");
+                }
+
+                if (vis_errors.length > 0) {
+                    errorMessageDiv.innerHTML = (errorMessageDiv.textContent ? errorMessageDiv.textContent + '<br>' : '') + vis_errors.join('<br>');
+                    errorMessageDiv.style.display = 'block';
+                    return;
+                }
+
+                const containerWidth = diagramContainer.clientWidth;
+                const containerHeight = diagramContainer.clientHeight;
+                const groundLevelY = containerHeight - 40; 
+                const drawingAreaHeight = groundLevelY - 20;
+
+                const tractorPortionLengthToSSU_m = tractorFrontOverhangVis_m + tractorSSUOffsetFromFrontAxle_actual_m;
+                const trailerPortionLengthFromSSU_m = trailerLengthVis_m - trailerKingpinToFrontVis_m;
+                const totalVisualLength_m = tractorPortionLengthToSSU_m + trailerPortionLengthFromSSU_m;
+
+                if (totalVisualLength_m <= 0) {
+                     errorMessageDiv.innerHTML = (errorMessageDiv.textContent ? errorMessageDiv.textContent + '<br>' : '') + "Невозможно рассчитать масштаб: общая визуальная длина некорректна или отрицательна. Проверьте параметры тягача и п/п для рисунка.";
+                     errorMessageDiv.style.display = 'block';
+                     return;
+                }
+
+                const scale = (containerWidth - 40) / totalVisualLength_m; 
+
+                const scaledTractorOverallLength = tractorLengthVis_m * scale;
+                const scaledTractorOverallHeight = Math.min(tractorHeightVis_m * scale, drawingAreaHeight * 0.9);
+                const tractorX = 20; 
+                const tractorOverallTopY = groundLevelY - scaledTractorOverallHeight; 
+
+                const actualCabinHeight = scaledTractorOverallHeight * tractorCabinHeightPercentage;
+                const actualCabinLength = scaledTractorOverallLength * tractorCabinLengthPercentage;
+                const actualChassisHeight = scaledTractorOverallHeight * (1 - tractorCabinHeightPercentage); 
+
+                const chassisDiv = document.createElement('div');
+                chassisDiv.className = 'vehicle-component tractor-chassis';
+                chassisDiv.style.width = `${scaledTractorOverallLength}px`; 
+                chassisDiv.style.height = `${actualChassisHeight}px`;
+                chassisDiv.style.left = `${tractorX}px`;
+                chassisDiv.style.top = `${tractorOverallTopY + actualCabinHeight}px`; 
+                diagramContainer.appendChild(chassisDiv);
+
+                const cabinDiv = document.createElement('div');
+                cabinDiv.className = 'vehicle-component tractor-cabin';
+                cabinDiv.style.width = `${actualCabinLength}px`;
+                cabinDiv.style.height = `${actualCabinHeight}px`;
+                cabinDiv.style.left = `${tractorX}px`; 
+                cabinDiv.style.top = `${tractorOverallTopY}px`; 
+                diagramContainer.appendChild(cabinDiv);
+                
+                const tractorFrontAxleX_absolute = tractorX + (tractorFrontOverhangVis_m * scale);
+                createAxleVisuals(tractorFrontAxleX_absolute, groundLevelY, diagramContainer, scaledTractorOverallHeight);
+                createAxleLoadLabel(tractorFrontAxleX_absolute, groundLevelY, `F: ${loadF.toFixed(0)} кг`, diagramContainer);
+
+                const tractorRearAxleX_absolute = tractorX + ((tractorFrontOverhangVis_m + tractorBaseLmax_actual_m) * scale);
+                createAxleVisuals(tractorRearAxleX_absolute, groundLevelY, diagramContainer, scaledTractorOverallHeight);
+                createAxleLoadLabel(tractorRearAxleX_absolute, groundLevelY, `R: ${loadR.toFixed(0)} кг`, diagramContainer);
+                
+                const scaledTrailerVisualLength = trailerLengthVis_m * scale;
+                const scaledTrailerVisualHeight = Math.min(trailerHeightVis_m * scale, drawingAreaHeight * 0.8);
+                const trailerBodyTopY = groundLevelY - scaledTrailerVisualHeight;
+                
+                const kingpinX_absolute = tractorX + tractorPortionLengthToSSU_m * scale; 
+                const trailerBodyFrontX = kingpinX_absolute - (trailerKingpinToFrontVis_m * scale);
+
+                const semitrailerDiv = document.createElement('div');
+                semitrailerDiv.className = 'vehicle-component semitrailer-body';
+                semitrailerDiv.style.width = `${scaledTrailerVisualLength}px`;
+                semitrailerDiv.style.height = `${scaledTrailerVisualHeight}px`;
+                semitrailerDiv.style.left = `${trailerBodyFrontX}px`;
+                semitrailerDiv.style.top = `${trailerBodyTopY}px`;
+                diagramContainer.appendChild(semitrailerDiv);
+
+                const ssuY = (tractorOverallTopY + actualCabinHeight) + actualChassisHeight * 0.3; 
+                createFifthWheelMarker(kingpinX_absolute, ssuY, `M: ${loadM.toFixed(0)} кг`, diagramContainer);
+
+                const trailerBogieCenterX_absolute = kingpinX_absolute + (trailerBaseZ_actual_m * scale);
+                const axleVisualSpacingOnScreen = 12; 
+                const totalBogieVisualWidth = (numTrailerAxles - 1) * axleVisualSpacingOnScreen;
+                const firstAxleInBogieX = trailerBogieCenterX_absolute - totalBogieVisualWidth / 2;
+
+                for (let i = 0; i < numTrailerAxles; i++) {
+                    const currentAxleX = firstAxleInBogieX + i * axleVisualSpacingOnScreen;
+                    createAxleVisuals(currentAxleX, groundLevelY, diagramContainer, scaledTrailerVisualHeight);
+                }
+                const trailerBogieLabelText = `Тележка: ${totalLoadN.toFixed(0)} кг (${numTrailerAxles}×${individualLoadN.toFixed(0)} кг)`;
+                createAxleLoadLabel(trailerBogieCenterX_absolute, groundLevelY, trailerBogieLabelText, diagramContainer);
+            }
+
+            function createFifthWheelMarker(x_center, y_center, text, parent) {
+                const marker = document.createElement('div');
+                marker.className = 'fifth-wheel-marker';
+                marker.style.left = `${x_center - 10}px`; 
+                marker.style.top = `${y_center - 5}px`;  
+                parent.appendChild(marker);
+
+                const label = document.createElement('div');
+                label.className = 'axle-load-display';
+                label.textContent = text;
+                label.style.left = `${x_center - 20}px`;
+                label.style.top = `${y_center - 30}px`; 
+                parent.appendChild(label);
+            }
+
+            function drawDrumLayout(num_drums, drum_length_mm, drum_width_mm, trailer_internal_length_mm, trailer_internal_width_mm, trailer_visual_height_mm) {
+                drumSideViewContainer.innerHTML = '';
+                drumTopViewContainer.innerHTML = '';
+                const padding = 25; 
+
+                // --- Side View ---
+                if (drumSideViewContainer.clientWidth > 0 && trailer_internal_length_mm > 0 && num_drums > 0) {
+                    const viewWidth = drumSideViewContainer.clientWidth - 2 * padding;
+                    const viewHeight = drumSideViewContainer.clientHeight - 2 * padding;
+                    
+                    const scale = viewWidth / trailer_internal_length_mm;
+                    const scaledTrailerOutlineHeight = Math.min(trailer_visual_height_mm * scale, viewHeight * 0.8); 
+                    const scaledDrumDiameter = drum_width_mm * scale; // Diameter for circle is drum_width_mm
+                    const scaledDrumPlacementLength = drum_length_mm * scale; // Length each drum occupies
+
+                    const trailerOutlineY = padding + (viewHeight - scaledTrailerOutlineHeight) / 2;
+                    const trailerOutline = document.createElement('div');
+                    trailerOutline.className = 'drum-layout-trailer-outline';
+                    trailerOutline.style.width = `${trailer_internal_length_mm * scale}px`;
+                    trailerOutline.style.height = `${scaledTrailerOutlineHeight}px`;
+                    trailerOutline.style.left = `${padding}px`;
+                    trailerOutline.style.top = `${trailerOutlineY}px`;
+                    drumSideViewContainer.appendChild(trailerOutline);
+
+                    createDimensionLabel(`${trailer_internal_length_mm} мм`, padding + (trailer_internal_length_mm * scale) / 2, trailerOutlineY + scaledTrailerOutlineHeight + 5, drumSideViewContainer, { transform: 'translateX(-50%)'});
+                    
+                    let currentDrumStartX = padding; 
+                    const drumCenterY = trailerOutlineY + scaledTrailerOutlineHeight / 2;
+                    const frontOffset_mm = 0; 
+                    let totalDrumsPlacementLength_mm = 0;
+
+                    for (let i = 0; i < num_drums; i++) {
+                        const drumDiv = document.createElement('div');
+                        drumDiv.className = 'drum-visual';
+                        drumDiv.style.width = `${scaledDrumDiameter}px`;
+                        drumDiv.style.height = `${scaledDrumDiameter}px`;
+                        drumDiv.style.borderRadius = '50%'; 
+                        drumDiv.style.left = `${currentDrumStartX + (scaledDrumPlacementLength - scaledDrumDiameter) / 2}px`;
+                        drumDiv.style.top = `${drumCenterY - scaledDrumDiameter / 2}px`;
+                        drumSideViewContainer.appendChild(drumDiv);
+
+                        if (i === 0) { 
+                            createDimensionLabel(`D: ${drum_width_mm}`, parseFloat(drumDiv.style.left) + scaledDrumDiameter / 2, parseFloat(drumDiv.style.top) - 15, drumSideViewContainer, { transform: 'translateX(-50%)' });
+                            if (num_drums === 1) { 
+                                createDimensionLabel(`L: ${drum_length_mm}`, parseFloat(drumDiv.style.left) + scaledDrumDiameter / 2, parseFloat(drumDiv.style.top) + scaledDrumDiameter + 2, drumSideViewContainer, { transform: 'translateX(-50%)' });
+                            }
+                            createDimensionLabel(`${frontOffset_mm} мм`, padding / 2, drumCenterY, drumSideViewContainer, {transform: 'translateY(-50%)'});
+                        }
+                        
+                         if (i < num_drums - 1 && num_drums > 1) {
+                            const gap_mm = 0; // Assuming drums are placed one after another based on their length
+                            // If there's a visual gap because diameter < length, it's not a "spacing" gap
+                            // The space taken by one drum is drum_length_mm.
+                            // No explicit gap label unless specified.
+                        }
+                        totalDrumsPlacementLength_mm += drum_length_mm;
+                        currentDrumStartX += scaledDrumPlacementLength;
+                    }
+                     const rearOffset_mm = trailer_internal_length_mm - totalDrumsPlacementLength_mm;
+                     if (num_drums > 0) {
+                        createDimensionLabel(`${rearOffset_mm.toFixed(0)} мм`, padding + (trailer_internal_length_mm * scale) + 5, drumCenterY, drumSideViewContainer, { transform: 'translateY(-50%)' });
+                     }
+                }
+
+                // --- Top View ---
+                if (drumTopViewContainer.clientWidth > 0 && trailer_internal_length_mm > 0 && trailer_internal_width_mm > 0 && num_drums > 0) {
+                    const viewWidth = drumTopViewContainer.clientWidth - 2 * padding;
+                    const viewHeight = drumTopViewContainer.clientHeight - 2 * padding;
+
+                    const scaleX = viewWidth / trailer_internal_length_mm;
+                    const scaleY = viewHeight / trailer_internal_width_mm;
+                    const scale = Math.min(scaleX, scaleY);
+
+                    const scaledTrailerIntLength = trailer_internal_length_mm * scale;
+                    const scaledTrailerIntWidth = trailer_internal_width_mm * scale;
+                    const scaledDrumLength = drum_length_mm * scale; 
+                    const scaledDrumWidth = drum_width_mm * scale; 
+
+                    const offsetX = padding + (viewWidth - scaledTrailerIntLength) / 2;
+                    const offsetY = padding + (viewHeight - scaledTrailerIntWidth) / 2;
+
+                    const trailerOutline = document.createElement('div');
+                    trailerOutline.className = 'drum-layout-trailer-outline';
+                    trailerOutline.style.width = `${scaledTrailerIntLength}px`;
+                    trailerOutline.style.height = `${scaledTrailerIntWidth}px`;
+                    trailerOutline.style.left = `${offsetX}px`;
+                    trailerOutline.style.top = `${offsetY}px`;
+                    drumTopViewContainer.appendChild(trailerOutline);
+
+                    createDimensionLabel(`${trailer_internal_length_mm} мм`, offsetX + scaledTrailerIntLength / 2, offsetY + scaledTrailerIntWidth + 5, drumTopViewContainer, { transform: 'translateX(-50%)' });
+                    createDimensionLabel(`${trailer_internal_width_mm} мм`, offsetX - 5, offsetY + scaledTrailerIntWidth / 2, drumTopViewContainer, { transform: 'translateY(-50%) translateX(-100%)' });
+
+                    let currentX = offsetX;
+                    const drumY = offsetY + (scaledTrailerIntWidth - scaledDrumWidth) / 2; 
+                    const frontOffsetVal_mm = 0; 
+                    let totalDrumsLength_mm = 0;
+
+                    for (let i = 0; i < num_drums; i++) {
+                        const drumDiv = document.createElement('div');
+                        drumDiv.className = 'drum-visual'; 
+                        drumDiv.style.width = `${scaledDrumLength}px`;
+                        drumDiv.style.height = `${scaledDrumWidth}px`;
+                        drumDiv.style.left = `${currentX}px`;
+                        drumDiv.style.top = `${drumY}px`;
+                        drumTopViewContainer.appendChild(drumDiv);
+
+                        if (i === 0) { 
+                            createDimensionLabel(`L: ${drum_length_mm}`, currentX + scaledDrumLength / 2, drumY - 15, drumTopViewContainer, { transform: 'translateX(-50%)' });
+                            createDimensionLabel(`W: ${drum_width_mm}`, currentX - 5, drumY + scaledDrumWidth / 2, drumTopViewContainer, { transform: 'translateY(-50%) translateX(-100%)' });
+                            createDimensionLabel(`${frontOffsetVal_mm} мм`, offsetX - 25, offsetY + scaledTrailerIntWidth / 2, drumTopViewContainer, { transform: 'translateY(-50%) translateX(-100%)', color: '#065f46' });
+                        }
+                        totalDrumsLength_mm += drum_length_mm;
+                        currentX += scaledDrumLength;
+                    }
+                    
+                    const sideOffsetVal_mm = (trailer_internal_width_mm - drum_width_mm) / 2;
+                    if (drum_width_mm <= trailer_internal_width_mm) { 
+                        createDimensionLabel(`${sideOffsetVal_mm.toFixed(0)} мм`, offsetX + scaledTrailerIntLength / 2, offsetY -10 , drumTopViewContainer, { transform: 'translateX(-50%)', color: '#065f46' });
+                    }
+                    
+                    const rearOffsetVal_mm = trailer_internal_length_mm - totalDrumsLength_mm;
+                    createDimensionLabel(`${rearOffsetVal_mm.toFixed(0)} мм`, offsetX + scaledTrailerIntLength + 5, offsetY + scaledTrailerIntWidth/2 , drumTopViewContainer, { transform: 'translateY(-50%)', color: '#065f46' });
+                }
+            }
+
+        });
+    </script>
+</body>
+</html>
